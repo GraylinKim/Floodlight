@@ -1,19 +1,21 @@
 #Import the files we need to work with the OS and System variables
 import os, sys
 
-#Get the drive of this file (should be root of django app)
-#__file__ is a magic python variable that gets the current file
-appFolder = os.path.dirname(__file__)
-
-#Step back to the parent directory by joining with a ../
-parentFolder = os.path.join(appFolder,'../')
-
-#Append this folder to the system path so python can find our application files
-sys.path.append(parentFolder)
-
-#Set the location of settings file for django
-os.environ['DJANGO_SETTINGS_MODULE'] = 'Floodlight.settings'
-
-#Import the wsgi handler and launch it!
+#Import handlers to setup our app to run as a wsgi child process
 import django.core.handlers.wsgi
+
+#Get the drive of this file (should be in root of django app)
+#__file__ is a magic python variable that gets the current file
+appPath = os.path.dirname(__file__)
+
+#Split the path into appDirectory and appModule
+(appDirectory,appModule) = os.path.split(appPath)
+
+#Add the appDirectory to the system path
+sys.path.append(appDirectory)
+
+#Use the appModule.settings as the location of settings django settings file
+os.environ['DJANGO_SETTINGS_MODULE'] = appModule+'.settings'
+
+#Run our application!!
 application = django.core.handlers.wsgi.WSGIHandler()
