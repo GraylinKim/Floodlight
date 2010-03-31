@@ -10,7 +10,9 @@ class Bill:
     def loadXML(self, xml):
         dom = minidom.parseString(xml)
         bill = dom.getElementsByTagName('bills')
-        assert bill.length==1,"Only 1 Bill can be loaded at a time. %s bills recieved" % bill.length
+        assert(bill.length==1,
+            "Only 1 Bill can be loaded at a time. " +
+             bill.length + "%s bills recieved")
         
   
 class OpenLegislation:
