@@ -1,31 +1,27 @@
+# -*- coding: utf-8 -*-
 # Django settings for floodlight project.
+
+#Import private settings from config module
+from config import secret,database
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
-    # ('Your Name', 'your_email@domain.com'),
+     ('Graylin Kim', 'graylin.kim@gmail.com'),
+     ('Cihan Caglayan','caglac@rpi.edu'),
 )
 
 MANAGERS = ADMINS
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.', # Add 'postgresql_psycopg2', 'postgresql', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': '',                      # Or path to database file if using sqlite3.
-        'USER': '',                      # Not used with sqlite3.
-        'PASSWORD': '',                  # Not used with sqlite3.
-        'HOST': '',                      # Set to empty string for localhost. Not used with sqlite3.
-        'PORT': '',                      # Set to empty string for default. Not used with sqlite3.
-    }
-}
+DATABASES = database.info
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
 # although not all choices may be available on all operating systems.
 # If running in a Windows environment this must be set to the same as your
 # system time zone.
-TIME_ZONE = 'America/Chicago'
+TIME_ZONE = 'America/New_York'
 
 # Language code for this installation. All choices can be found here:
 # http://www.i18nguy.com/unicode/language-identifiers.html
@@ -52,7 +48,7 @@ MEDIA_URL = ''
 ADMIN_MEDIA_PREFIX = '/media/'
 
 # Make this unique, and don't share it with anybody.
-SECRET_KEY = 'en8t%*spgj*w)@wvl++76n0*v&nvgewa0ex8wut)os=sobtq6#'
+SECRET_KEY = secret.info
 
 # List of callables that know how to import templates from various sources.
 TEMPLATE_LOADERS = (
@@ -80,6 +76,7 @@ TEMPLATE_DIRS = (
 INSTALLED_APPS = (
     'django.contrib.auth',
     'django.contrib.contenttypes',
+    #'django.contrib.admin',
     'django.contrib.sessions',
     'django.contrib.sites',
     'django.contrib.messages',
