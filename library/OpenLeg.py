@@ -118,7 +118,6 @@ if __name__ == '__main__':
     import inspect
     from time import time
     
-    
     openleg = OpenLegislation()
     start = time()
     bills = openleg.searchBySponsor('alesi')

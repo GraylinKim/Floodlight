@@ -1,0 +1,3 @@
+Floodlight is a open source project in the Rensselaer Center for Open Source Software (RCOS) sponsored by Sean O' Sullivan. We are working with the New York Senate CIO's office to bring transparency to New York Legislation. Our primary roles will be creating open source libraries (python initially) to provide object oriented access to their OpenLegislation API and applying those APIs to a simple website that reagregrates the bill information around the entities of Senators and Committees.
+
+The python library is currently under development and can be found in /library/OpenLeg.py
