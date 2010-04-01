@@ -4,17 +4,52 @@ from xml.dom import minidom
 
 class Bill:
     
-    def __init__(self,xml):
-        pass
+    @staticmethod
+    def loadFromXML(xml):
+        try:
+            dom = minidom.parseString(xml)
+        except TypeError as inst:
+            if isinstance(xml,minidom):
+                dom = xml
+            else:
+                raise inst
         
-    def loadXML(self, xml):
-        dom = minidom.parseString(xml)
-        bill = dom.getElementsByTagName('bills')
-        assert(bill.length==1,
-            "Only 1 Bill can be loaded at a time. " +
-             bill.length + "%s bills recieved")
+        elements = dom.getElementsByTagName('bill')
         
-  
+        bills = list()
+        for element in elements:
+            bill = Bill()
+            bill.id = element.getAttribute('billId')
+            bill.year = element.getAttribute('year')
+            bill.title = element.getAttribute('title')
+            bill.sponsor = element.getAttribute('sponsor')
+            bill.law_section = element.getAttribute('lawSection')
+            for child in element.childNodes:
+                if 'summary' == child.nodeName.lower():
+                    try:
+                        bill.summary = child.firstChild.nodeValue
+                    except AttributeError:
+                        bill.summary = ""
+                elif 'committee' == child.nodeName.lower():
+                    try:
+                        bill.committee = child.firstChild.nodeValue
+                    except AttributeError:
+                        bill.committee = ""
+                elif 'cosponsors' == child.nodeName.lower():
+                    try:
+                        bill.cosponsors = list()
+                        cosponsors = element.getElementsByTagName('cosponsors').item(0)
+                        bill.cosponsors = cosponsors.firstChild.firstChild.nodeValue
+                    except AttributeError:
+                        bill.cosponsors = list()
+            bills.append(bill)
+        
+        return bills
+
+    def __str__(self):
+        return 'Bill ' + str(bill.id) + ': ' + str(bill.title)
+
+
 class OpenLegislation:
     """Provides a simple interface to the open legislation API
     
@@ -31,7 +66,7 @@ class OpenLegislation:
     """
   
     #Base Request URL
-    baseURL = 'http://open.nysenate.gov/legislation/api'
+    baseURL = 'http://open-staging.nysenate.gov/legislation/api'
   
     #Meta data on the state of the wrapper
     supportedVersions = ['1.0']
@@ -75,9 +110,20 @@ class OpenLegislation:
 
 #Protect our testing code. Will only execute if file is directly run
 if __name__ == '__main__':
-    openleg = OpenLegislation()
-    result = openleg.searchbyid('S3153')
-    bill = Bill()
-    bill.loadXML(result)
+    import inspect
+    from time import time
     
-    print result
+    openleg = OpenLegislation()
+    start = time()
+    result = openleg.searchbykeyword('bank')
+    returned = time()
+    bills = Bill.loadFromXML(result)
+    loaded = time()
+    
+    for bill in bills:
+        for member in inspect.getmembers(bill):
+            print member
+        print '\n\n'
+    
+    print str(returned-start)+' to get xml and '+str(loaded-returned)+' to parse it into bills'
+    
