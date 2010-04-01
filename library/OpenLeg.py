@@ -71,7 +71,7 @@ class OpenLegislation:
     #Meta data on the state of the wrapper
     supportedVersions = ['1.0']
     supportedCommands = ['bill','committee','search','sponsor']
-    supportedFormats = ['xml','csv','json','html']
+    supportedFormats = ['xml']#,'csv','json','html']
   
     #Data defaults
     defaultVersion = '1.0'
@@ -105,7 +105,7 @@ class OpenLegislation:
     def _makeRequest(self,command,argument):
         requestURL = '/'.join([self.baseURL,self.version,self.format,command,argument])
         request = urllib.urlopen(requestURL)
-        return request.read()
+        return Bill.loadFromXML(request.read())
     
 
 #Protect our testing code. Will only execute if file is directly run
