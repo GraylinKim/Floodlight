@@ -38,8 +38,10 @@ class Bill:
                 elif 'cosponsors' == child.nodeName.lower():
                     try:
                         bill.cosponsors = list()
-                        cosponsors = element.getElementsByTagName('cosponsors').item(0)
-                        bill.cosponsors = cosponsors.firstChild.firstChild.nodeValue
+                        cosponsors = element.getElementsByTagName('cosponsors')
+                        
+                        for cosponsor in cosponsors.item(0).childNodes:
+                            bill.cosponsors.append(cosponsor.firstChild.nodeValue)
                     except AttributeError:
                         bill.cosponsors = list()
             bills.append(bill)
@@ -55,10 +57,9 @@ class OpenLegislation:
     
     USAGE:
         openleg = OpenLegislation(version='1.0',format='xml')
-        bills = openleg.searchbysponsor('alesi') //Returns the XML text
+        bills = openleg.searchbysponsor('alesi') //Returns the list of Bill type
     
     TODO:
-        One time format requests (instead of always using set default)
         Returning varied numbers of results, by appending '/first/last' to the end
         Documentation of functions and more usage
         Study other APIs to see how they handle some of these things
@@ -89,21 +90,25 @@ class OpenLegislation:
         assert (version in self.supportedVersions), 'Version '+version+' is not supported'
         self.version = version
     
-    def searchbysponsor(self,sponsor):
+    def getBillById(self,billid):
+        return self._makeRequest('bill',urllib.quote(billid,""))
+    
+    def searchBySponsor(self,sponsor):
         return self._makeRequest('sponsor',urllib.quote(sponsor,""))
     
-    def searchbycommittee(self,committee):
+    def searchByCommittee(self,committee):
         return self._makeRequest('search',urllib.quote(committee,""))
     
-    def searchbyid(self,billid):
+    def searchById(self,billid):
         return self._makeRequest('search',urllib.quote(billid,""))
     
-    def searchbykeyword(self,keywordtext):
+    def searchByKeyword(self,keywordtext):
         return self._makeRequest('search',urllib.quote(keywordtext,""))
     
     #Internal Request mechanism, pretty simple at this point
     def _makeRequest(self,command,argument):
         requestURL = '/'.join([self.baseURL,self.version,self.format,command,argument])
+        print requestURL
         request = urllib.urlopen(requestURL)
         return Bill.loadFromXML(request.read())
     
@@ -113,17 +118,21 @@ if __name__ == '__main__':
     import inspect
     from time import time
     
+    
     openleg = OpenLegislation()
     start = time()
-    result = openleg.searchbykeyword('bank')
-    returned = time()
-    bills = Bill.loadFromXML(result)
-    loaded = time()
+    bills = openleg.searchBySponsor('alesi')
     
-    for bill in bills:
-        for member in inspect.getmembers(bill):
+    print str(time()-start)+' seconds to search.'
+    print str(len(bills))+' bills found'
+    
+    try:
+        print 'Inspecting a sample bill'
+        for member in inspect.getmembers(bills[0]):
             print member
         print '\n\n'
-    
-    print str(returned-start)+' to get xml and '+str(loaded-returned)+' to parse it into bills'
+    except IndexError:
+        print 'No bills found by search'
+        
+
     
