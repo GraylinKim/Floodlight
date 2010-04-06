@@ -2,7 +2,7 @@
 # Django settings for floodlight project.
 
 #Import private settings from config module
-from config import secret,database,media_root
+from config import secret,database
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
