@@ -3,7 +3,9 @@ import urllib
 from xml.dom import minidom
 
 class Bill:
+    """Represents the bills as maintained by Open Legislation
     
+    """
     @staticmethod
     def loadFromXML(xml):
         try:
