@@ -44,6 +44,12 @@ class Bill:
                             bill.cosponsors.append(cosponsor.firstChild.nodeValue)
                     except AttributeError:
                         bill.cosponsors = list()
+                elif 'text' == child.nodeName.lower():
+                    try:
+                        bill.text = child.firstChild.nodeValue
+                    except AttributeError:
+                        print "Error getting text!!"
+                        bill.text = ""
             bills.append(bill)
         
         return bills
@@ -120,15 +126,19 @@ if __name__ == '__main__':
     
     openleg = OpenLegislation()
     start = time()
-    bills = openleg.searchBySponsor('alesi')
+    bills = openleg.searchByKeyword('healthcare')
     
     print str(time()-start)+' seconds to search.'
     print str(len(bills))+' bills found'
     
     try:
         print 'Inspecting a sample bill'
-        for member in inspect.getmembers(bills[0]):
-            print member
+        for bill in bills:
+            for member in bill.__dict__:
+                print str(member) + ': ' + str(getattr(bill,member))
+            print '\n'
+        #for member in inspect.getmembers(bills[0]):
+        #    print member
         print '\n\n'
     except IndexError:
         print 'No bills found by search'

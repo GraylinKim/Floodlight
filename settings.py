@@ -2,7 +2,7 @@
 # Django settings for floodlight project.
 
 #Import private settings from config module
-from config import secret,database
+from config import secret,database,media_root
 
 DEBUG = True
 TEMPLATE_DEBUG = DEBUG
@@ -45,7 +45,7 @@ MEDIA_URL = ''
 # URL prefix for admin media -- CSS, JavaScript and images. Make sure to use a
 # trailing slash.
 # Examples: "http://foo.com/media/", "/media/".
-ADMIN_MEDIA_PREFIX = '/media/'
+ADMIN_MEDIA_PREFIX = '/media/admin/'
 
 # Make this unique, and don't share it with anybody.
 SECRET_KEY = secret.info
@@ -54,7 +54,7 @@ SECRET_KEY = secret.info
 TEMPLATE_LOADERS = (
     'django.template.loaders.filesystem.Loader',
     'django.template.loaders.app_directories.Loader',
-#     'django.template.loaders.eggs.Loader',
+    'django.template.loaders.eggs.Loader',
 )
 
 MIDDLEWARE_CLASSES = (
@@ -76,7 +76,7 @@ TEMPLATE_DIRS = (
 INSTALLED_APPS = (
     'django.contrib.auth',
     'django.contrib.contenttypes',
-    #'django.contrib.admin',
+    'django.contrib.admin',
     'django.contrib.sessions',
     'django.contrib.sites',
     'django.contrib.messages',
