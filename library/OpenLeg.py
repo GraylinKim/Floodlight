@@ -95,15 +95,16 @@ class OpenLegislation:
     supportedVersions = ['1.0','1']
     supportedCommands = ['bill','committee','search','sponsor']
     
-
+    defaultMode = 'object'
+    defaultVersion = '1.0'
         
     # 'processed' format returns data processed into classes
     supportedModes = ['xml','csv','json','object']
     
-    def __init__(self,mode='object',version='1.0'):
+    def __init__(self,mode=defaultMode,version=defaultVersion):
         """Provide defaults for ease of use"""
         self.setVersion(version)
-        self.setFormat(format)
+        self.setMode(mode)
     
     def setMode(self,mode):
         """Assert supported mode before setting"""
@@ -116,26 +117,46 @@ class OpenLegislation:
         self.version = version
     
     def getBillById(self,billid):
-        return self._makeRequest('bill',urllib.quote(billid,""))
+        return self._makeRequest('bill',billid)
     
     def searchBySponsor(self,sponsor):
-        return self._makeRequest('sponsor',urllib.quote(sponsor,""))
+        return self._makeRequest('sponsor',sponsor)
     
     def searchByCommittee(self,committee):
-        return self._makeRequest('search',urllib.quote(committee,""))
+        return self._makeRequest('search',committee)
     
     def searchById(self,billid):
-        return self._makeRequest('search',urllib.quote(billid,""))
+        return self._makeRequest('search',billid)
     
     def searchByKeyword(self,keywordtext):
-        return self._makeRequest('search',urllib.quote(keywordtext,""))
+        return self._makeRequest('search',keywordtext)
     
+    def _buildURL(self,command,argument):
+        """Detects current mode and builds the appropriate request URL"""
+        
+        #All user input must be quoted to ensure safe html encoding
+        argument = urllib.quote(argument,"")
+        
+        #object construction currently requires XML
+        if self.mode == 'object':
+            mode = 'xml'
+        else:
+            mode = self.mode
+        
+        return '/'.join([self.baseURL,self.version,mode,command,argument])
+        
     #Internal Request mechanism, pretty simple at this point
     def _makeRequest(self,command,argument):
-        requestURL = '/'.join([self.baseURL,self.version,self.mode,command,argument])
+        """Executes the request and processes the data returned"""
+       
+        requestURL = self._buildURL(command,argument)
         print requestURL
         request = urllib.urlopen(requestURL)
-        return Bill.loadFromXML(request.read())
+        data = request.read()
+        
+        if self.mode == 'object':
+            return Bill.loadFromXML(data)
+        return data
     
 
 #Protect our testing code. Will only execute if file is directly run
@@ -143,6 +164,10 @@ if __name__ == '__main__':
     import inspect
     from time import time
     
+    openleg = OpenLegislation()
+    print openleg.searchByKeyword('banking')
+    
+    """
     openleg = OpenLegislation()
     start = time()
     bills = openleg.searchByKeyword('healthcare')
@@ -161,6 +186,6 @@ if __name__ == '__main__':
         print '\n\n'
     except IndexError:
         print 'No bills found by search'
-        
+    """    
 
     
