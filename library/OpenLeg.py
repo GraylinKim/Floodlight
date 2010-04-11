@@ -78,34 +78,42 @@ class OpenLegislation:
     """Provides a simple interface to the open legislation API
     
     USAGE:
-        openleg = OpenLegislation(version='1.0',format='xml')
+        openleg = OpenLegislation(version='1.0',mode='object')
         bills = openleg.searchbysponsor('alesi') //Returns the list of Bill type
     
     TODO:
         Returning varied numbers of results, by appending '/first/last' to the end
         Documentation of functions and more usage
-        Study other APIs to see how they handle some of these things
     
     """
   
     #Base Request URL
     baseURL = 'http://open-staging.nysenate.gov/legislation/api'
   
-    #Meta data on the state of the wrapper
+    #Meta data on the state of the library
     supportedVersions = ['1.0','1']
     supportedCommands = ['bill','committee','search','sponsor']
-    
-    defaultMode = 'object'
-    defaultVersion = '1.0'
-        
     # 'processed' format returns data processed into classes
     supportedModes = ['xml','csv','json','object']
     
-    def __init__(self,mode=defaultMode,version=defaultVersion):
+    defaultMode = 'object'
+    defaultVersion = '1.0'
+    defaultPageSize = 20
+    
+    def __init__(self,
+                mode=defaultMode,
+                version=defaultVersion,
+                pagesize=defaultPageSize):
         """Provide defaults for ease of use"""
         self.setVersion(version)
         self.setMode(mode)
-    
+        self.setPageSize(pagesize)
+        
+    def setPageSize(self,pagesize):
+        """Assert Valid Page size before setting"""
+        assert(pagesize>0 and pagesize<100),'Pagesize ('+str(pagesize)+') must be between 1 and 100'
+        self.pagesize = pagesize
+        
     def setMode(self,mode):
         """Assert supported mode before setting"""
         assert (mode in self.supportedModes),'Mode '+mode+' is not supported'
@@ -119,21 +127,20 @@ class OpenLegislation:
     def getBillById(self,billid):
         return self._makeRequest('bill',billid)
     
-    def searchBySponsor(self,sponsor):
-        return self._makeRequest('sponsor',sponsor)
+    def searchBySponsor(self,sponsor,page='1'):
+        return self._makeRequest('sponsor',sponsor,page)
     
-    def searchByCommittee(self,committee):
-        return self._makeRequest('search',committee)
+    def searchByCommittee(self,committee,page='1'):
+        return self._makeRequest('search',committee,page)
     
-    def searchById(self,billid):
-        return self._makeRequest('search',billid)
+    def searchById(self,billid,page='1'):
+        return self._makeRequest('search',billid,page)
     
-    def searchByKeyword(self,keywordtext):
-        return self._makeRequest('search',keywordtext)
+    def searchByKeyword(self,keywordtext,page='1'):
+        return self._makeRequest('search',keywordtext,page)
     
-    def _buildURL(self,command,argument):
+    def _buildURL(self,command,argument,page):
         """Detects current mode and builds the appropriate request URL"""
-        
         #All user input must be quoted to ensure safe html encoding
         argument = urllib.quote(argument,"")
         
@@ -143,13 +150,12 @@ class OpenLegislation:
         else:
             mode = self.mode
         
-        return '/'.join([self.baseURL,self.version,mode,command,argument])
+        return '/'.join([self.baseURL,self.version,mode,command,argument,str(page),str(self.pagesize)])
         
     #Internal Request mechanism, pretty simple at this point
-    def _makeRequest(self,command,argument):
+    def _makeRequest(self,command,argument,page):
         """Executes the request and processes the data returned"""
-       
-        requestURL = self._buildURL(command,argument)
+        requestURL = self._buildURL(command,argument,page)
         print requestURL
         request = urllib.urlopen(requestURL)
         data = request.read()
@@ -157,21 +163,19 @@ class OpenLegislation:
         if self.mode == 'object':
             return Bill.loadFromXML(data)
         return data
-    
+
+
 
 #Protect our testing code. Will only execute if file is directly run
 if __name__ == '__main__':
     import inspect
     from time import time
     
-    openleg = OpenLegislation()
-    print openleg.searchByKeyword('banking')
-    
-    """
-    openleg = OpenLegislation()
+    openleg = OpenLegislation(pagesize=30)
     start = time()
-    bills = openleg.searchByKeyword('healthcare')
-    
+    bills1 = openleg.searchByKeyword('healthcare',2)
+    print len(bills1)
+    """
     print str(time()-start)+' seconds to search.'
     print str(len(bills))+' bills found'
     
@@ -181,11 +185,9 @@ if __name__ == '__main__':
             for member in bill.__dict__:
                 print str(member) + ': ' + str(getattr(bill,member))
             print '\n'
-        #for member in inspect.getmembers(bills[0]):
-        #    print member
         print '\n\n'
     except IndexError:
         print 'No bills found by search'
-    """    
+    """
 
     
