@@ -142,7 +142,7 @@ class OpenLegislation:
     def _buildURL(self,command,argument,page):
         """Detects current mode and builds the appropriate request URL"""
         #All user input must be quoted to ensure safe html encoding
-        argument = urllib.quote(argument,"")
+        argument = urllib.quote_plus(argument,"")
         
         #object construction currently requires XML
         if self.mode == 'object':
