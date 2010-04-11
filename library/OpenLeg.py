@@ -6,8 +6,16 @@ class Bill:
     """Represents the bills as maintained by Open Legislation
     
     """
+    
     @staticmethod
     def loadFromXML(xml):
+        """Loads a list of bills from an XML string or minidom class
+        
+        Converts into into minidom and pulls the bill data out of the root node
+        Crawls the minidom for each bill's data
+        Build the bills list to return to user
+        
+        """
         try:
             dom = minidom.parseString(xml)
         except TypeError as inst:
@@ -16,16 +24,22 @@ class Bill:
             else:
                 raise inst
         
-        elements = dom.getElementsByTagName('bill')
-        
         bills = list()
+        
+        #Get the bill nodes from the docket and construct Bills one by one   
+        elements = dom.getElementsByTagName('bill')
         for element in elements:
             bill = Bill()
+            
+            #billID,year,title,sponsor,lawSection are currently bill attributes
             bill.id = element.getAttribute('billId')
             bill.year = element.getAttribute('year')
             bill.title = element.getAttribute('title')
             bill.sponsor = element.getAttribute('sponsor')
             bill.law_section = element.getAttribute('lawSection')
+            
+            #ordering insensitive processing of sub node values
+            #"" value if empty (no child nodes)
             for child in element.childNodes:
                 if 'summary' == child.nodeName.lower():
                     try:
@@ -37,23 +51,23 @@ class Bill:
                         bill.committee = child.firstChild.nodeValue
                     except AttributeError:
                         bill.committee = ""
-                elif 'cosponsors' == child.nodeName.lower():
-                    try:
-                        bill.cosponsors = list()
-                        cosponsors = element.getElementsByTagName('cosponsors')
-                        
-                        for cosponsor in cosponsors.item(0).childNodes:
-                            bill.cosponsors.append(cosponsor.firstChild.nodeValue)
-                    except AttributeError:
-                        bill.cosponsors = list()
                 elif 'text' == child.nodeName.lower():
                     try:
                         bill.text = child.firstChild.nodeValue
                     except AttributeError:
-                        print "Error getting text!!"
                         bill.text = ""
+                elif 'cosponsors' == child.nodeName.lower():
+                    try:
+                        bill.cosponsors = list()
+                        cosponsors = element.getElementsByTagName('cosponsors')
+                        #Cosponsors is a nested list, loop the second level here
+                        for cosponsor in cosponsors.item(0).childNodes:
+                            bill.cosponsors.append(cosponsor.firstChild.nodeValue)
+                    except AttributeError:
+                        bill.cosponsors = list()
+                #endif
+            #endfor
             bills.append(bill)
-        
         return bills
 
     def __str__(self):
@@ -78,23 +92,26 @@ class OpenLegislation:
     baseURL = 'http://open-staging.nysenate.gov/legislation/api'
   
     #Meta data on the state of the wrapper
-    supportedVersions = ['1.0']
+    supportedVersions = ['1.0','1']
     supportedCommands = ['bill','committee','search','sponsor']
-    supportedFormats = ['xml']#,'csv','json','html']
-  
-    #Data defaults
-    defaultVersion = '1.0'
-    defaultFormat = 'xml'
     
-    def __init__(self,format=defaultFormat,version=defaultVersion):
+
+        
+    # 'processed' format returns data processed into classes
+    supportedModes = ['xml','csv','json','object']
+    
+    def __init__(self,mode='object',version='1.0'):
+        """Provide defaults for ease of use"""
         self.setVersion(version)
         self.setFormat(format)
     
-    def setFormat(self,format):
-        assert (format in self.supportedFormats),'Format '+format+' is not supported'
-        self.format = format
+    def setMode(self,mode):
+        """Assert supported mode before setting"""
+        assert (mode in self.supportedModes),'Mode '+mode+' is not supported'
+        self.mode = mode
     
     def setVersion(self,version):
+        """Assert supported version before setting"""
         assert (version in self.supportedVersions), 'Version '+version+' is not supported'
         self.version = version
     
@@ -115,7 +132,7 @@ class OpenLegislation:
     
     #Internal Request mechanism, pretty simple at this point
     def _makeRequest(self,command,argument):
-        requestURL = '/'.join([self.baseURL,self.version,self.format,command,argument])
+        requestURL = '/'.join([self.baseURL,self.version,self.mode,command,argument])
         print requestURL
         request = urllib.urlopen(requestURL)
         return Bill.loadFromXML(request.read())
