@@ -77,6 +77,14 @@ class Bill:
 class OpenLegislation:
     """Provides a simple interface to the open legislation API
     
+    Supports two types of requests. Get Requests and Search Requests.
+    
+    Get Requests are appropriate when you already know what 1 specific thing
+    you are looking for.
+    
+    Search Requests are appropriate when you want to return a collection of
+    result documents
+    
     USAGE:
         openleg = OpenLegislation(version='1.0',mode='object')
         bills = openleg.searchbysponsor('alesi') //Returns the list of Bill type
@@ -87,18 +95,23 @@ class OpenLegislation:
     
     """
   
-    #Base Request URL
-    baseURL = 'http://open-staging.nysenate.gov/legislation/api'
+    #Base Request URL used in _build(.*)URL requests below
+    baseURL = 'http://open-staging.nysenate.gov/legislation'
   
     #Meta data on the state of the library
-    supportedVersions = ['1.0','1']
-    supportedCommands = ['bill','committee','search','sponsor']
-    # 'processed' format returns data processed into classes
-    supportedModes = ['xml','csv','json','object']
+    supportedVersions = ['1.0','1']    
     
+    #need different type support because they have different type support :(
+    supportedGetTypes = set(['meeting','transcript','calendar','bill'])
+    supportedSearchTypes = set(['bill','vote','action','transcript','meeting','calendar'])
+    #The object mode returns our classes
+    supportedModes = set(['xml','csv','json','object'])
+
+    #Class defaults
     defaultMode = 'object'
     defaultVersion = '1.0'
     defaultPageSize = 20
+    objectDataType = 'json'
     
     def __init__(self,
                 mode=defaultMode,
@@ -108,30 +121,21 @@ class OpenLegislation:
         self.setVersion(version)
         self.setMode(mode)
         self.setPageSize(pagesize)
-        
-    def setPageSize(self,pagesize):
-        """Assert Valid Page size before setting"""
-        assert(pagesize>0 and pagesize<100),'Pagesize ('+str(pagesize)+') must be between 1 and 100'
-        self.pagesize = pagesize
-        
-    def setMode(self,mode):
-        """Assert supported mode before setting"""
-        assert (mode in self.supportedModes),'Mode '+mode+' is not supported'
-        self.mode = mode
     
-    def setVersion(self,version):
-        """Assert supported version before setting"""
-        assert (version in self.supportedVersions), 'Version '+version+' is not supported'
-        self.version = version
-    
+    """
+        Get Methods
+    """
     def getBillById(self,billid):
-        return self._makeRequest('bill',billid)
+        return self._makeRequest('get','bill',billid)
     
+    """
+        Searching Methods
+    """
     def searchBySponsor(self,sponsor,page='1'):
-        return self._makeRequest('sponsor',sponsor,page)
+        return self._makeRequest('search',['bill'],'sponsor:'+sponsor,page)
     
     def searchByCommittee(self,committee,page='1'):
-        return self._makeRequest('search',committee,page)
+        return self._makeRequest('search',['bill'],'committee:'+committee,page)
     
     def searchById(self,billid,page='1'):
         return self._makeRequest('search',billid,page)
@@ -139,42 +143,97 @@ class OpenLegislation:
     def searchByKeyword(self,keywordtext,page='1'):
         return self._makeRequest('search',keywordtext,page)
     
-    def _buildURL(self,command,argument,page):
-        """Detects current mode and builds the appropriate request URL"""
-        #All user input must be quoted to ensure safe html encoding
-        argument = urllib.quote_plus(argument,"") 
+    """
+        Setter Methods, do the appropriate support checking and lowcase
+    """
+    def setPageSize(self,pagesize):
+        """Assert Valid Page size before setting"""
+        assert pagesize>0 and pagesize<100,'Pagesize ('+str(pagesize)+') must be between 1 and 100'
+        self.pagesize = pagesize
         
-        #object construction currently requires XML
+    def setMode(self,mode):
+        """Assert supported mode before setting"""
+        assert mode.lower() in self.supportedModes,'Mode '+mode+' is not supported'
+        self.mode = mode.lower()
+    
+    def setVersion(self,version):
+        """Assert supported version before setting"""
+        assert version.lower() in self.supportedVersions, 'Version '+version+' is not supported'
+        self.version = version.lower()
+        
+    """
+        Request methods, build the correct URL, get the data and return it
+    """
+    #Internal Request mechanism, pretty simple at this point
+    def _makeRequest(self,rtype,otype,term,pageNum=1):
+        """Executes the request and processes the data returned"""
+        
+        #Determine the correct data format
+        assert rtype.lower() in ['search','get'], "Invalid request type (use search or get)"
         if self.mode == 'object':
-            mode = 'xml'
+            mode = self.objectDataType
         else:
             mode = self.mode
-        
-        return '/'.join([self.baseURL,self.version,mode,command,argument,str(page),str(self.pagesize)])
-        
-    #Internal Request mechanism, pretty simple at this point
-    def _makeRequest(self,command,argument,page):
-        """Executes the request and processes the data returned"""
-        requestURL = self._buildURL(command,argument,page)
-        print requestURL
+            
+        #Build the appropriate URL request string
+        if rtype.lower()=='search':
+            requestURL = self._buildSearchURL(otype,term,mode,pageNum)
+        else:
+            requestURL = self._buildGetURL(otype,term,mode)
+            
+        #Open the request and get the data
         request = urllib.urlopen(requestURL)
         data = request.read()
         
+        #Objectify the data if necessary
         if self.mode == 'object':
-            return Bill.loadFromXML(data)
-        return data
+            return data#Bill.loadFromXML(data)
+        else:
+            return data
+        
+    def _buildSearchURL(self, objects, term, mode, pageNum):
+        """The Search URL is used to retrieve collections of documents"""
+        
+        #Assert valid object filters and pageNums
+        assert set(objects).issubset(self.supportedSearchTypes), 'invalid types specified'
+        assert pageNum>0, 'pageNum must be positive integer'
+        
+        #Embed each type in otype:<type> string, logically combine
+        otype_filter = ' OR '.join(['otype:'+object for object in objects])
+        #Combine filter and search text to form the term
+        term = '('+otype_filter+') AND ('+urllib.quote_plus(term)+')'
+        
+        #Pair the arguments up in a dictionary
+        args = {
+            'term':term,
+            'pageIdx':pageNum,
+            'pageSize':self.pagesize,
+            'format':mode
+        }
+        #Embed each arg in the key value pair, and join with &. Should I urllib quote this?
+        args = '&'.join([key+'='+str(value) for key,value in args.iteritems()])
+        
+        #Join the different parts into a final URL, mark arguments with a ?
+        return '/'.join( [self.baseURL,'search','?'+args] )
+        
+    def _buildGetURL(self,otype,oid,mode):
+        """The Get URL is used to retrieve specific document types"""
+        
+        #Check for valid object type
+        assert otype in self.supportedGetTypes, str(otype)+' is invalid type'
+            
+        #Join the differentparts into a final URL, quote their oid input
+        return '/'.join( [self.baseURL,'api',self.version,mode,otype,urllib.quote_plus(oid)] )
 
 
 
 #Protect our testing code. Will only execute if file is directly run
 if __name__ == '__main__':
-    import inspect
-    from time import time
+    openLeg = OpenLegislation(mode='xml')
+    print openLeg._buildGetURL('bill','S66002','xml')
+    print openLeg._buildSearchURL(['bill','vote','action'],'S66002','object',1)
     
-    openleg = OpenLegislation(pagesize=30)
-    start = time()
-    bills1 = openleg.searchByKeyword('healthcare',2)
-    print len(bills1)
+    print openLeg.searchBySponsor('alesi')
     """
     print str(time()-start)+' seconds to search.'
     print str(len(bills))+' bills found'
@@ -189,5 +248,3 @@ if __name__ == '__main__':
     except IndexError:
         print 'No bills found by search'
     """
-
-    
