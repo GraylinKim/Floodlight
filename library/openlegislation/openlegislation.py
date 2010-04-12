@@ -1,94 +1,52 @@
 # -*- coding: utf-8 -*-
 import urllib
-from xml.dom import minidom
-
-class Bill:
-    """Represents the bills as maintained by Open Legislation
-    
-    """
-    
-    @staticmethod
-    def loadFromXML(xml):
-        """Loads a list of bills from an XML string or minidom class
-        
-        Converts into into minidom and pulls the bill data out of the root node
-        Crawls the minidom for each bill's data
-        Build the bills list to return to user
-        
-        """
-        try:
-            dom = minidom.parseString(xml)
-        except TypeError as inst:
-            if isinstance(xml,minidom):
-                dom = xml
-            else:
-                raise inst
-        
-        bills = list()
-        
-        #Get the bill nodes from the docket and construct Bills one by one   
-        elements = dom.getElementsByTagName('bill')
-        for element in elements:
-            bill = Bill()
-            
-            #billID,year,title,sponsor,lawSection are currently bill attributes
-            bill.id = element.getAttribute('billId')
-            bill.year = element.getAttribute('year')
-            bill.title = element.getAttribute('title')
-            bill.sponsor = element.getAttribute('sponsor')
-            bill.law_section = element.getAttribute('lawSection')
-            
-            #ordering insensitive processing of sub node values
-            #"" value if empty (no child nodes)
-            for child in element.childNodes:
-                if 'summary' == child.nodeName.lower():
-                    try:
-                        bill.summary = child.firstChild.nodeValue
-                    except AttributeError:
-                        bill.summary = ""
-                elif 'committee' == child.nodeName.lower():
-                    try:
-                        bill.committee = child.firstChild.nodeValue
-                    except AttributeError:
-                        bill.committee = ""
-                elif 'text' == child.nodeName.lower():
-                    try:
-                        bill.text = child.firstChild.nodeValue
-                    except AttributeError:
-                        bill.text = ""
-                elif 'cosponsors' == child.nodeName.lower():
-                    try:
-                        bill.cosponsors = list()
-                        cosponsors = element.getElementsByTagName('cosponsors')
-                        #Cosponsors is a nested list, loop the second level here
-                        for cosponsor in cosponsors.item(0).childNodes:
-                            bill.cosponsors.append(cosponsor.firstChild.nodeValue)
-                    except AttributeError:
-                        bill.cosponsors = list()
-                #endif
-            #endfor
-            bills.append(bill)
-        return bills
-
-    def __str__(self):
-        return 'Bill ' + str(bill.id) + ': ' + str(bill.title)
-
+from objects.bill import Bill
 
 class OpenLegislation:
     """Provides a simple interface to the open legislation API
     
-    Supports two types of requests. Get Requests and Search Requests.
+    Access to legislative data is provided in two central ways: Get and Search. 
+    These requests are dependent both on the arguments passed in and the current
+    state of the library.
     
-    Get Requests are appropriate when you already know what 1 specific thing
-    you are looking for.
+    Get requests should be used when you are looking for a single document of a
+    single type for which you have unique identification. An example of this 
+    would be retrieving bill number S66002.
     
-    Search Requests are appropriate when you want to return a collection of
-    result documents
+        Get Methods:
+            getBillById(billid)
+            
+    Search requests should be used whenever get requests do not apply. Searches
+    may be applied across several types. Search terms may by fuzzy [~,*], apply
+    boolean logic [AND,OR], and support ordering of evaluation [()]. Searches 
+    can additionally be customized with result ordering. Since searches may
+    return a large number of results, pagination occurs. The size of each page 
+    is a property of the library and the page nubmer you are requesting is 
+    passed in with each request.
     
-    USAGE:
-        openleg = OpenLegislation(version='1.0',mode='object')
-        bills = openleg.searchbysponsor('alesi') //Returns the list of Bill type
+        Search Methods:
+            searchBySponsor(sponsor,pageNumber=1)
+            
+    Library state is contained in 3 properties: mode, version, and pagesize. 
+    These properties have default values of 'object','1.0', and 20 by default.
+    The default values can be overridden in the library constructor or through
+    direct use of the setMode, setPageSize, and setVersion methods.
     
+        Library State Variables:
+        
+            mode: determines the format of the data returned from user requests
+                Available modes: xml, json, csv, html, and object        
+                    Xml,json,csv,html return the raw data as retrieved.
+                    Object returns objects.py objects preloaded with the data.
+            
+            version: determines the version used in the when building URLs
+                Available versions: 1.0
+                    Only one version has been released, this not yet useful.
+            
+            pagesize: determines the max number of results per page
+                Available sizes: natural numbers (integers > 0)
+                    There is no known maximum size for this value
+
     TODO:
         Returning varied numbers of results, by appending '/first/last' to the end
         Documentation of functions and more usage
@@ -105,7 +63,8 @@ class OpenLegislation:
     supportedGetTypes = set(['meeting','transcript','calendar','bill'])
     supportedSearchTypes = set(['bill','vote','action','transcript','meeting','calendar'])
     #The object mode returns our classes
-    supportedModes = set(['xml','csv','json','object'])
+    
+    supportedModes = set(['html','xml','csv','json','object'])
 
     #Class defaults
     defaultMode = 'object'
@@ -133,7 +92,8 @@ class OpenLegislation:
     """
     def searchBySponsor(self,sponsor,page='1'):
         return self._makeRequest('search',['bill'],'sponsor:'+sponsor,page)
-    
+
+    """Need to think more about these    
     def searchByCommittee(self,committee,page='1'):
         return self._makeRequest('search',['bill'],'committee:'+committee,page)
     
@@ -142,12 +102,20 @@ class OpenLegislation:
     
     def searchByKeyword(self,keywordtext,page='1'):
         return self._makeRequest('search',keywordtext,page)
+    """
     
     """
         Setter Methods, do the appropriate support checking and lowcase
     """
     def setPageSize(self,pagesize):
-        """Assert Valid Page size before setting"""
+        """Assert Valid Page size before setting
+        
+        >>>openLeg = OpenLegislation()
+        >>>openLeg.setPageSize(10)
+        >>>print openLeg.pagesize
+        10
+        
+        """
         assert pagesize>0 and pagesize<100,'Pagesize ('+str(pagesize)+') must be between 1 and 100'
         self.pagesize = pagesize
         
@@ -183,6 +151,7 @@ class OpenLegislation:
             
         #Open the request and get the data
         request = urllib.urlopen(requestURL)
+        assert request.getcode() == 200, 'Code '+str(request.getcode())+' returned, for url: '+requestURL
         data = request.read()
         
         #Objectify the data if necessary
@@ -229,12 +198,17 @@ class OpenLegislation:
 
 #Protect our testing code. Will only execute if file is directly run
 if __name__ == '__main__':
+    import doctest
+    #doctest.testmod()
+
+
+    """
     openLeg = OpenLegislation(mode='xml')
     print openLeg._buildGetURL('bill','S66002','xml')
     print openLeg._buildSearchURL(['bill','vote','action'],'S66002','object',1)
     
-    print openLeg.searchBySponsor('alesi')
-    """
+    print openLeg.searchBySponsor('alesi')    
+    
     print str(time()-start)+' seconds to search.'
     print str(len(bills))+' bills found'
     
