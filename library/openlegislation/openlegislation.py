@@ -28,7 +28,27 @@ class OpenLegislation:
     passed in with each request.
     
         Search Methods:
-            searchBySponsor(sponsor,pageNumber=1)
+            
+            search(searchString,pageNumber=1)
+            advancedSearch(types,searchString,pageNumber=1)
+            
+            and
+        
+            <Find Specific then Search Methods>
+            searchSponsor(sponsor,types,searchString,pageNumber=1)
+            searchMemo(exactMatch,types,searchString,pageNumber=1)
+            searchFullText(exactMatch,types,searchString,pageNumber=1)
+            searchCommittee(committee,types,searchString,pageNumber=1)
+            
+            and
+            
+            <Generic Search Methods>
+            searchActions(searchString,pageNumber=1)
+            searchBills(searchString,pageNumber=1)
+            searchCalendars(searchString,pageNumber=1)
+            searchMeetings(searchString,pageNumber=1)
+            searchTranscripts(searchString,pageNumber=1)
+            searchVotes(searchString,pageNumber=1)
             
     Library state is contained in 3 properties: mode, version, and pagesize. 
     These properties have default values of 'object','1.0', and 20 by default.
@@ -50,10 +70,6 @@ class OpenLegislation:
                 Available sizes: natural numbers (integers > 0)
                     There is no known maximum size for this value
 
-    TODO:
-        Returning varied numbers of results, by appending '/first/last' to the end
-        Documentation of functions and more usage
-    
     """
     
     #Base Request URL used in _build(.*)URL requests below
@@ -66,8 +82,7 @@ class OpenLegislation:
     objectDataType = 'json'
     supportedVersions = [1]
     
-    searchextras = {
-        'Committee' :'committee',
+    searchbills = {
         'FullText'  :'full',
         'Memo'      :'memo',
         'Sponsor'   :'sponsor',
@@ -105,21 +120,33 @@ class OpenLegislation:
     """
         Search Methods
     """
-    def search(self,text,page='1'):
-        return self._makeRequest('search',[],text,page)
-        
-    def advancedSearch(self,types,text,page='1'):
-        """Allows specification of types returned and free keywords"""
+    def search(self,string,types=[],sponsor=None,committee=None,page=1):
+        string = '('+string+')'
+        string = string if sponsor=None else string+' AND sponsor:'+sponsor
+        string = string if committee=None else string+' AND committee:'+committee
         return self._makeRequest('search',types,text,page)
         
+    def searchFullText(self,string,types=[],sponsor=None,committee=None,page=1):
+        string = 'full:('+string+')'
+        string = string if sponsor=None else string+' AND sponsor:'+sponsor
+        string = string if committee=None else string+' AND committee:'+committee
+        return self._makeRequest('search',types,string,page)
+    
+    def searchMemo(self,string,types=[],sponsor=None,committee=None,page=1):
+        string = 'memo:('+string+')'
+        string = string if sponsor=None else string+' AND sponsor:'+sponsor
+        string = string if committee=None else string+' AND committee:'+committee
+        return self._makeRequest('search',types,string,page)
+        
     def __getattr__(self,name):
+        """Generates some search methods"""
         matches = re.match('search(.*)$',name)
         if matches:
             subject = matches.group(1)
             #If they specify a type without otype, do it this way
-            if subject in set(self.searchextras.keys()):
-                def custom_search(match,types,searchString,page='1'):
-                    text = self.searchextras[subject]+':'+match
+            if subject in set(self.searchbills.keys()):
+                def custom_search(match,searchString,page='1'):
+                    text = self.searchbills[subject]+':"'+match+'"'
                     if searchString:
                         text = text+' AND ('+searchString+')'
                     return self._makeRequest('search',types,text,page)
@@ -138,27 +165,8 @@ class OpenLegislation:
             raise AttributeError, 'No attribute: '+name
         
     """
-        Setter Methods, do the appropriate support checking and lowcase
-    """
-    def setPageSize(self,pagesize):
-        """Assert Valid Page size before setting"""
-        assert pagesize>0 and pagesize<100,'Pagesize ('+str(pagesize)+') must be between 1 and 100'
-        self.pagesize = pagesize
-        
-    def setMode(self,mode):
-        """Assert supported mode before setting"""
-        assert mode.lower() in self.supportedModes,'Mode '+mode+' is not supported'
-        self.mode = mode.lower()
-    
-    def setVersion(self,version):
-        """Assert supported version before setting"""
-        assert int(float(version)) in self.supportedVersions,'Version '+str(version)+' is not supported'
-        self.version = version.lower()
-        
-    """
         Request methods, build the correct URL, get the data and return it
     """
-    #Internal Request mechanism, pretty simple at this point
     def _makeRequest(self,rtype,otype,term,pageNum=1):
         """Executes the request and processes the data returned"""
         
@@ -225,6 +233,24 @@ class OpenLegislation:
         #Join the differentparts into a final URL, quote their oid input
         return '/'.join( [self.baseURL,'api',self.version,mode,otype,urllib.quote_plus(oid)] )
 
+    """
+        Setter Methods, do the appropriate support checking and lowcase
+    """
+    def setPageSize(self,pagesize):
+        """Assert Valid Page size before setting"""
+        assert pagesize>0 and pagesize<100,'Pagesize ('+str(pagesize)+') must be between 1 and 100'
+        self.pagesize = pagesize
+        
+    def setMode(self,mode):
+        """Assert supported mode before setting"""
+        assert mode.lower() in self.supportedModes,'Mode '+mode+' is not supported'
+        self.mode = mode.lower()
+    
+    def setVersion(self,version):
+        """Assert supported version before setting"""
+        assert int(float(version)) in self.supportedVersions,'Version '+str(version)+' is not supported'
+        self.version = version.lower()
+
 
 
 #Protect our testing code. Will only execute if file is directly run
@@ -250,23 +276,3 @@ if __name__ == '__main__':
     ]
     for url in [urllib.unquote_plus(url) for url in results]:
         print url
-    """
-    openLeg = OpenLegislation(mode='xml')
-    print openLeg._buildGetURL('bill','S66002','xml')
-    print openLeg._buildSearchURL(['bill','vote','action'],'S66002','object',1)
-    
-    print openLeg.searchBySponsor('alesi')    
-    
-    print str(time()-start)+' seconds to search.'
-    print str(len(bills))+' bills found'
-    
-    try:
-        print 'Inspecting a sample bill'
-        for bill in bills:
-            for member in bill.__dict__:
-                print str(member) + ': ' + str(getattr(bill,member))
-            print '\n'
-        print '\n\n'
-    except IndexError:
-        print 'No bills found by search'
-    """
