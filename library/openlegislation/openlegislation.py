@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 import urllib
 import re
-from objects import Bill
-
+#from objects import Bill
+    
 class OpenLegislation:
     """Provides a simple interface to the open legislation API
     
     Access to legislative data is provided in two central ways: Get and Search. 
-    These requests are dependent both on the arguments passed in and the current
-    state of the library.
+    Both types of methods return OpenLegislationQuery classes which provide
+    simple methods for handling complex queries. These classes are constructed
+    with both on the arguments passed in and the current state of the library.
     
     Get requests should be used when you are looking for a single document of a
     single type for which you have unique identification. An example of this 
@@ -22,45 +23,46 @@ class OpenLegislation:
     Search requests should be used whenever get requests do not apply. Searches
     may be applied across several types. Search terms may by fuzzy [~,*], apply
     boolean logic [AND,OR], and support ordering of evaluation [()]. Searches 
-    can additionally be customized with result ordering. Since searches may
-    return a large number of results, pagination occurs. The size of each page 
-    is a property of the library and the page nubmer you are requesting is 
-    passed in with each request.
+    can additionally be customized with result ordering (not yet supported).
     
         Search Methods:
             
-            search(searchString,pageNumber=1)
-            advancedSearch(types,searchString,pageNumber=1)
+            search(searchString,types=[],sponsor=None,committee=None)
+            searchFullText(searchString,types=[],sponsor=None,committee=None)
+            searchMemo(searchString,types=[],sponsor=None,committee=None)
+    
+        Search String:
             
-            and
+            Search Strings in open legislation support set logic [AND,OR],
+            logical grouping [()], exact matching [""], wildcards [*], and fuzzy
+            matching [~]. Example usage and results below:
+            
+            TODO: Add Examples
+            
+            
+        Optional Arguments
         
-            <Find Specific then Search Methods>
-            searchSponsor(sponsor,types,searchString,pageNumber=1)
-            searchMemo(exactMatch,types,searchString,pageNumber=1)
-            searchFullText(exactMatch,types,searchString,pageNumber=1)
-            searchCommittee(committee,types,searchString,pageNumber=1)
+            types: describes the document type for get queries or a list of
+            types to include for search queries.
+                default: []
+                Available types: bill,vote,action,transcript,meeting,calendar
             
-            and
+            sponsor: restricts result to bills sponsored by the named senator.
+                default: None
+                Notes: sponsors are identfied by last name.
             
-            <Generic Search Methods>
-            searchActions(searchString,pageNumber=1)
-            searchBills(searchString,pageNumber=1)
-            searchCalendars(searchString,pageNumber=1)
-            searchMeetings(searchString,pageNumber=1)
-            searchTranscripts(searchString,pageNumber=1)
-            searchVotes(searchString,pageNumber=1)
-            
-    Library state is contained in 3 properties: mode, version, and pagesize. 
-    These properties have default values of 'object','1.0', and 20 by default.
+            committee: restricts results to documents associated with the named
+            committee.
+                default: None
+                
+
+                        
+    Library state is contained in 2 properties: version, and pagesize. 
+    These properties have default values of '1.0', and 20 by default.
     The default values can be overridden in the library constructor or through
-    direct use of the setMode, setPageSize, and setVersion methods.
+    direct use of the setPageSize, and setVersion methods.
     
         Library State Variables:
-        
-            mode: determines the format of the data returned from user requests
-                Available modes: xml, json, csv, html, and object        
-                    Xml,json,csv,html return the raw data as retrieved.
-                    Object returns objects.py objects preloaded with the data.
             
             version: determines the version used in the when building URLs
                 Available versions: 1.0
@@ -72,207 +74,202 @@ class OpenLegislation:
 
     """
     
-    #Base Request URL used in _build(.*)URL requests below
-    baseURL = 'http://open-staging.nysenate.gov/legislation'
-    
     #Note: Calendars are not supported because they are not yet stable
     supportedGetTypes = set(['meeting','transcript','bill'])
     supportedSearchTypes = set(['bill','vote','action','transcript','meeting','calendar'])
-    supportedModes = set(['html','xml','csv','json','object'])
+    supportedVersions = [1.0]
     objectDataType = 'json'
-    supportedVersions = [1]
     
-    searchbills = {
-        'FullText'  :'full',
-        'Memo'      :'memo',
-        'Sponsor'   :'sponsor',
-    }
-    searchotypes = {
-        'Actions'    :'action',
-        'Bills'      :'bill',
-        'Calendars'  :'calendar',
-        'Meetings'   :'meeting',
-        'Transcripts':'transcript',
-        'Votes'      :'vote',
-    }
-    
-    def __init__(self,mode='object',version='1.0',pagesize=20):
+    def __init__(self,version='1.0',pagesize=20):
         """Provide defaults for ease of use"""
         self.setVersion(version)
-        self.setMode(mode)
         self.setPageSize(pagesize)
     
-    """
-        Get Methods
-    """
     def getBill(self,billId):
-        return self._makeRequest('get','bill',billId)
+        return OpenLegislationQuery('get',billId,'bill',None,None,self.pagesize,self.version)
         
     def getMeeting(self,committee,number,session):
         assert number>0, 'Meeting number must be natural number (integer > 0)'
         assert re.match('\d{4}-\d{4}',session), 'Invalid session '+str(session)
         meetingId = '-'.join(['meeting',str(committee),str(number),str(session)])
-        return self._makeRequest('get','meeting',meetingId)
+        return OpenLegislationQuery('get',meetingid,'meeting',None,None,self.pagesize,self.version)
         
     def getTranscript(self,transcriptId):
-        return self._makeRequest('get','transcript',transcriptId)
+        return OpenLegislationQuery('get',transcriptId,'transcript',None,None,self.pagesize,self.version)
         
-    """
-        Search Methods
-    """
-    def search(self,string,types=[],sponsor=None,committee=None,page=1):
-        string = '('+string+')'
-        string = string if sponsor=None else string+' AND sponsor:'+sponsor
-        string = string if committee=None else string+' AND committee:'+committee
-        return self._makeRequest('search',types,text,page)
+    def search(self,string,types=[],sponsor=None,committee=None):
+        return OpenLegislationQuery('search',string,types,sponsor,committee,self.pagesize,self.version)
         
-    def searchFullText(self,string,types=[],sponsor=None,committee=None,page=1):
+    def searchFullText(self,string,types=[],sponsor=None,committee=None):
         string = 'full:('+string+')'
-        string = string if sponsor=None else string+' AND sponsor:'+sponsor
-        string = string if committee=None else string+' AND committee:'+committee
-        return self._makeRequest('search',types,string,page)
+        return OpenLegislationQuery('search',string,types,sponsor,committee,self.pagesize,self.version)
     
-    def searchMemo(self,string,types=[],sponsor=None,committee=None,page=1):
+    def searchMemo(self,string,types=[],sponsor=None,committee=None):
         string = 'memo:('+string+')'
-        string = string if sponsor=None else string+' AND sponsor:'+sponsor
-        string = string if committee=None else string+' AND committee:'+committee
-        return self._makeRequest('search',types,string,page)
-        
-    def __getattr__(self,name):
-        """Generates some search methods"""
-        matches = re.match('search(.*)$',name)
-        if matches:
-            subject = matches.group(1)
-            #If they specify a type without otype, do it this way
-            if subject in set(self.searchbills.keys()):
-                def custom_search(match,searchString,page='1'):
-                    text = self.searchbills[subject]+':"'+match+'"'
-                    if searchString:
-                        text = text+' AND ('+searchString+')'
-                    return self._makeRequest('search',types,text,page)
-                return custom_search
-            
-            #If they specify an otype, do it this way
-            elif subject in set(self.searchotypes.keys()):
-                def custom_search(searchString,page='1'):
-                    return self._makeRequest('search',[self.searchotypes[subject]],searchString,page)
-                return custom_search
-                
-            #Else its not a valid request
-            else:
-                raise AttributeError, 'No attribute: '+name
-        else:
-            raise AttributeError, 'No attribute: '+name
-        
-    """
-        Request methods, build the correct URL, get the data and return it
-    """
-    def _makeRequest(self,rtype,otype,term,pageNum=1):
-        """Executes the request and processes the data returned"""
-        
-        #Determine the correct data format
-        assert rtype.lower() in ['search','get'], "Invalid request type (use search or get)"
-        if self.mode == 'object':
-            mode = self.objectDataType
-        else:
-            mode = self.mode
-        
-        #Build the appropriate URL request string
-        if rtype.lower()=='search':
-            requestURL = self._buildSearchURL(otype,term,mode,pageNum)
-        else:
-            requestURL = self._buildGetURL(otype,term,mode)
-        
-        return requestURL  
-                  
-        #Open the request and get the data
-        request = urllib.urlopen(requestURL)
-        assert request.getcode() == 200, 'Code '+str(request.getcode())+' returned, for url: '+requestURL
-        data = request.read()
-        
-        #Objectify the data if necessary
-        if self.mode == 'object':
-            return data#Bill.loadFromXML(data)
-        else:
-            return data
-        
-    def _buildSearchURL(self, objects, term, mode, pageNum):
-        """The Search URL is used to retrieve collections of documents"""
-        
-        #Assert valid object filters and pageNums
-        assert set(objects).issubset(self.supportedSearchTypes), 'invalid types specified'
-        assert pageNum>0, 'pageNum must be positive integer'
-        
-        #Embed each type in otype:<type> string, logically combine
-        otype_filter = ' OR '.join(['otype:'+object for object in objects])
-        #Combine filter and search text to form the term
-        if term:
-            term = '('+otype_filter+') AND ('+urllib.quote_plus(term)+')'
-        else:
-            term = (otype_filter)
-        
-        #Pair the arguments up in a dictionary
-        args = {
-            'term':term,
-            'pageIdx':pageNum,
-            'pageSize':self.pagesize,
-            'format':mode
-        }
-        #Embed each arg in the key value pair, and join with &. Should I urllib quote this?
-        args = '&'.join([key+'='+str(value) for key,value in args.iteritems()])
-        
-        #Join the different parts into a final URL, mark arguments with a ?
-        return '/'.join( [self.baseURL,'search','?'+args] )
-        
-    def _buildGetURL(self,otype,oid,mode):
-        """The Get URL is used to retrieve specific document types"""
-        
-        #Check for valid object type
-        assert otype in self.supportedGetTypes, str(otype)+' is invalid type'
-            
-        #Join the differentparts into a final URL, quote their oid input
-        return '/'.join( [self.baseURL,'api',self.version,mode,otype,urllib.quote_plus(oid)] )
-
-    """
-        Setter Methods, do the appropriate support checking and lowcase
-    """
+        return OpenLegislationQuery('search',string,types,sponsor,committee,self.pagesize,self.version)
+    
     def setPageSize(self,pagesize):
         """Assert Valid Page size before setting"""
         assert pagesize>0 and pagesize<100,'Pagesize ('+str(pagesize)+') must be between 1 and 100'
         self.pagesize = pagesize
-        
-    def setMode(self,mode):
-        """Assert supported mode before setting"""
-        assert mode.lower() in self.supportedModes,'Mode '+mode+' is not supported'
-        self.mode = mode.lower()
     
     def setVersion(self,version):
         """Assert supported version before setting"""
-        assert int(float(version)) in self.supportedVersions,'Version '+str(version)+' is not supported'
+        assert float(version) in self.supportedVersions,'Version '+str(version)+' is not supported'
         self.version = version.lower()
 
+class OpenLegislationQuery:
+    """Holds all the query parameters. Used to construct URLs and make requests.
+    
+    Queries contain the logic for both constructing queries from parameters and
+    executing those queries. It is not recommended that you construct queries on
+    your own. Instead you should use the available OpenLegislation methods which
+    will gnerate the queries for you. This ensures meaningful and accurate
+    queries are produced. Queries have the following elements:
+    
+        qtype: determines the kind of query that you wish to execute
+            Available qtypes: get, search
+        
+        string: identifies the document to get; contains the search text
+            Available Modifiers: AND, OR, (), *, ~, ""
+            Notes: See detailed explanation under searchString in the
+            OpenLegislation documentation above
+            
+        Optional Parameters (and their defaults)
+        
+            types: describes the document type for get queries or a
+            list of types to include for search queries.
+                default: []
+                Available types: bill,vote,action,transcript,meeting,calendar
+            
+            sponsor: restricts result to bills sponsored by the named senator.
+                default: None
+                Notes: sponsors are identfied by last name.
+            
+            committee: restricts results to documents associated with the
+            named committee.
+                default: None
 
+            pagesize: the number of results returned with each request
+                default: 20
+                Available sizes: 0 < pagesize < unknown
+                
+            version: the version of the API to query with (for compatibility)
+                default: 1.0
+                Available versions: 1.0
+    
+    Queries are executed by calling a method corresponding to the format you 
+    wish to retrieve the data in and indicating the page number to retrieve. In
+    some cases the data returned will change depending on the mode chosen due to
+    inconsistencies in Open Legislation. The following modes are available:
+        
+        xml(page=1) - Returns the data in XML format
+        json(page=1) - Returns the data in JSON format
+        csv(page=1)  - Returns the data in CSV format
+        html(page=1) - Returns the data in HTML format
+        object(page=1) - Returns the data preloaded into objects for convenience
+
+    Since searches may return a large number of results, pagination occurs. The
+    size of each page is typically a property of the library passed in during 
+    query creation but can also be changed on a query basis through the pagesize
+    parameter.
+    
+    """
+    baseURL = 'http://open-staging.nysenate.gov/legislation'
+    supportedGetTypes = set(['meeting','transcript','bill'])
+    supportedSearchTypes = set(['bill','vote','action','transcript','meeting','calendar'])
+    supportedModes = set(['html','xml','csv','json','object'])
+    
+    def __init__(self,qtype,string,types=[],sponsor=None,committee=None,pagesize=20,version=1.0):
+        qtype = qtype.lower()
+        assert qtype=='get' or qtype=='search',
+            "Invalid query type ("+qtype+"). Use 'get' or 'set'"
+        assert qtype=='search' or not types==[],
+            "Get requests must have a type specified"
+            
+        self.qtype = qtype
+        self.string = string
+        self.type = str(types) if qtype == 'get' else set(types)
+        self.sponsor = sponsor
+        self.committee = committee
+        self.pagesize = pagesize
+        self.version = version
+        
+    def url(self,mode,page=1):
+        #Adjust mode when objects are being returned
+        mode = 'json' if mode == 'object' else mode
+        assert page>0, 'Page number must be greater than zero'
+        
+        func = self._getURL if self.qtype=='get' else self._searchURL
+        return self.func(mode,page)
+        
+    def _getURL(self,mode,page):
+        assert self.type in self.supportedGetTypes, self.type +' is invalid type'
+        string = urllib.quote_plus(self.string)
+        url =  '/'.join( [self.baseURL,'api',self.version,mode,'get',string] )
+         
+    def _searchURL(self,mode,page):
+        assert self.type.issubset(self.supportedSearchTypes),
+            'invalid search types specified: '+' ,'.join(self.type)
+        
+        #Build full search term with optional committee,sponsor, and types
+        prefix = ""
+        if self.committee:
+            committee = 'committee:'+self.committee
+            prefix = prefix+' AND '+committee if prefix else committee
+        if self.sponsor:
+            sponsor = 'sponsor:'+self.sponsor
+            prefix = prefix+' AND '+sponsor if prefix else sponsor
+        if otype_filter:
+            otypes = ' OR '.join(['otype:'+object for object in self.type])
+            prefix = prefix+' AND ('+otypes+')' if prefix else '('+otypes+')'
+        if self.string:
+            term = self.string if not prefix else prefix+' AND ('+self.string+')'
+        else:
+            term = prefix
+        
+        #Embed each arg in the key value pair, and join with &.
+        args = '&'.join([
+            key+'='+str(value) for key,value in {
+                'term':urllib.quote_plus(term),
+                'pageIdx':page,
+                'pageSize':self.pagesize,
+                'format':mode
+            }.iteritems()
+        ])
+        
+        #Join the pieces into a final URL, mark arguments with a ?
+        url =  '/'.join( [self.baseURL,'search','?'+args] )
+    
+    def __getattr__(self,name):
+        if not name.lower() in self.supportedModes:
+            raise AttributeError
+            
+        def execute(page=1):
+            requestURL = self.url(name.lower(),page)
+            request = urllib.urlopen(requestURL)
+            assert request.getcode() == 200, 'Code '+str(request.getcode())+' returned, for url: '+requestURL
+            data = request.read()
+            
+            # TODO: Object creation and loading
+            if name == 'object':
+                return data#Bill.loadFromXML(data)
+            else:
+                return data
+                
+        return execute
 
 #Protect our testing code. Will only execute if file is directly run
 if __name__ == '__main__':
-    import doctest
-    #doctest.testmod()
     
     openLeg = OpenLegislation()
     results = [
-        '-------------------------',
-        ' Specific Search Queries ',
-        '-------------------------',
-        openLeg.searchSponsor('ALESI',['bill'],'jobs~ AND benefits~'),
-        openLeg.searchCommittee('AGING',['vote'],"healthcare OR medicare"),
-        openLeg.searchFullText('tax',['bill'],'cuts~'),
-        ' ------------------------',
-        ' Generic Search Queries ',
-        ' ------------------------',
-        openLeg.searchActions('REFERRED TO FINANCE'),
-        openLeg.searchBills('health* AND cut*'),
-        openLeg.searchVotes('banking~'),
-        openLeg.searchTranscripts('tabled OR failed'),
+        openLeg.search('jobs~ AND benefits~',sponsor='ALESI',types=['bill']).url('object'),
+        openLeg.search('healthcare OR medicare',committee='AGING',types=['vote']).url('xml'),
+        openLeg.searchFullText('tax cuts~',types=['bill']).url('json')
     ]
     for url in [urllib.unquote_plus(url) for url in results]:
         print url
+        
+    print openLeg.search('healthcare OR medicare',committee='AGING',types=['vote']).xml()
+
