@@ -1,0 +1,155 @@
+    """Provides a simple interface to the open legislation API
+    
+    Access to legislative data is provided in two central ways: Get and Search. 
+    Both types of methods return OpenLegislationQuery classes which provide
+    simple methods for handling complex queries. These classes are constructed
+    with both on the arguments passed in and the current state of the library.
+    
+    Get requests should be used when you are looking for a single document of a
+    single type for which you have unique identification. An example of this 
+    would be retrieving bill number S66002.
+    
+        Get Methods:
+            getBill(billId)
+            getMeeting(committee,number,session)
+            getTranscript(transcriptNumber)
+            
+    Search requests should be used whenever get requests do not apply. Searches
+    may be applied across several types. Search terms may by fuzzy [~,*], apply
+    boolean logic [AND,OR], and support ordering of evaluation [()]. Searches 
+    can additionally be customized with result ordering (not yet supported).
+    
+        Search Methods:
+            
+            search(searchString,types=[],sponsor=None,committee=None)
+            searchFullText(searchString,types=[],sponsor=None,committee=None)
+            searchMemo(searchString,types=[],sponsor=None,committee=None)
+    
+        Search String:
+            
+            Search in open legislation supports boolean logic [AND,OR,NOT],
+            logical grouping [()], exact matching [""], wildcards [*], and fuzzy
+            matching [~]. Example usage and results below:
+            
+            #TODO: Add Examples
+            #
+            #
+            
+        Optional Arguments
+        
+            types: describes the document type for get queries or a list of
+            types to include for search queries.
+                default: []
+                Available types: bill,vote,action,transcript,meeting,calendar
+            
+            sponsor: restricts result to bills sponsored by the named senator.
+                default: None
+                Notes: sponsors are identfied by last name.
+            
+            committee: restricts results to documents associated with the named
+            committee.
+                default: None
+                
+
+                        
+    Library state is contained in 2 properties: version, and pagesize. 
+    These properties have default values of '1.0', and 20 by default.
+    The default values can be overridden in the library constructor or through
+    direct use of the setPageSize, and setVersion methods.
+    
+        Library State Variables:
+            
+            version: determines the version used in the when building URLs
+                Available versions: 1.0
+                    Only one version has been released, this not yet useful.
+            
+            pagesize: determines the max number of results per page
+                Available sizes: natural numbers (integers > 0)
+                    There is no known maximum size for this value
+
+    """
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    """Holds all the query parameters. Used to construct URLs and make requests.
+    
+    Queries contain the logic for both constructing queries from parameters and
+    executing those queries. It is not recommended that you construct queries on
+    your own. Instead you should use the available OpenLegislation methods which
+    will gnerate the queries for you. This ensures meaningful and accurate
+    queries are produced. Queries have the following elements:
+    
+        qtype: determines the kind of query that you wish to execute
+            Available qtypes: get, search
+        
+        string: identifies the document to get; contains the search text
+            Available Modifiers: AND, OR, NOT, (), *, ~, ""
+            Notes: See detailed explanation under searchString in the
+            OpenLegislation documentation above
+            
+        Optional Parameters (and their defaults)
+        
+            types: describes the document type for get queries or a
+            list of types to include for search queries.
+                default: []
+                Available types: bill,vote,action,transcript,meeting,calendar
+            
+            sponsor: restricts result to bills sponsored by the named senator.
+                default: None
+                Notes: sponsors are identfied by last name.
+            
+            committee: restricts results to documents associated with the
+            named committee.
+                default: None
+
+            pagesize: the number of results returned with each request
+                default: 20
+                Available sizes: 0 < pagesize < unknown
+                
+            version: the version of the API to query with (for compatibility)
+                default: 1.0
+                Available versions: 1.0
+    
+    Queries are executed by calling a method corresponding to the format you 
+    wish to retrieve the data in and indicating the page number to retrieve. In
+    some cases the data returned will change depending on the mode chosen due to
+    inconsistencies in Open Legislation. The following modes are available:
+        
+        xml(page=1) - Returns the data in XML format
+        json(page=1) - Returns the data in JSON format
+        csv(page=1)  - Returns the data in CSV format
+        html(page=1) - Returns the data in HTML format
+        object(page=1) - Returns the data preloaded into objects for convenience
+
+    Since searches may return a large number of results, pagination occurs. The
+    size of each page is typically a property of the library passed in during 
+    query creation but can also be changed on a query basis through the pagesize
+    parameter.
+    
+    """
+
